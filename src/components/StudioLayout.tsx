@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,13 +8,48 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Play, Sparkles, Image, Video, Wand2, Download, Settings } from 'lucide-react';
+import { Play, Sparkles, Image, Video, Wand2, Download, Settings, Key } from 'lucide-react';
+import { ApiKeyDialog } from './ApiKeyDialog';
+import { RunwareService, GenerateImageParams } from '@/services/runware';
+import { toast } from 'sonner';
+import sphaBranding from '@/assets/spha-logo.webp';
 
 export const StudioLayout = () => {
   const [script, setScript] = useState('');
   const [imagePrompt, setImagePrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [scenes, setScenes] = useState<Array<{id: string, description: string, imagePrompt: string, image?: string}>>([]);
+  const [scenes, setScenes] = useState<Array<{id: string, description: string, imagePrompt: string, image?: string, isGeneratingImage?: boolean}>>([]);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [runwareService, setRunwareService] = useState<RunwareService | null>(null);
+  const [apiKeyConnected, setApiKeyConnected] = useState(false);
+  const [imageSettings, setImageSettings] = useState({
+    style: 'photorealistic',
+    quality: 80,
+    aspectRatio: '16:9',
+    width: 1024,
+    height: 576
+  });
+
+  useEffect(() => {
+    // Check if API key exists in localStorage
+    const savedApiKey = localStorage.getItem('runware_api_key');
+    if (savedApiKey) {
+      initializeRunwareService(savedApiKey);
+    }
+  }, []);
+
+  const initializeRunwareService = (apiKey: string) => {
+    try {
+      const service = new RunwareService(apiKey);
+      setRunwareService(service);
+      setApiKeyConnected(true);
+      localStorage.setItem('runware_api_key', apiKey);
+      toast.success('API key connected successfully!');
+    } catch (error) {
+      toast.error('Failed to connect API key. Please try again.');
+      throw error;
+    }
+  };
 
   const handleGenerateScript = async () => {
     setIsGenerating(true);
@@ -70,12 +105,50 @@ FADE OUT.`;
     }, 2000);
   };
 
-  const handleGenerateImage = (sceneId: string) => {
-    setScenes(scenes.map(scene => 
-      scene.id === sceneId 
-        ? { ...scene, image: `https://picsum.photos/512/288?random=${sceneId}` }
-        : scene
+  const handleGenerateImage = async (sceneId: string) => {
+    if (!runwareService) {
+      setShowApiKeyDialog(true);
+      return;
+    }
+
+    const scene = scenes.find(s => s.id === sceneId);
+    if (!scene) return;
+
+    setScenes(scenes.map(s => 
+      s.id === sceneId 
+        ? { ...s, isGeneratingImage: true }
+        : s
     ));
+
+    try {
+      const imageParams: GenerateImageParams = {
+        positivePrompt: scene.imagePrompt,
+        width: imageSettings.width,
+        height: imageSettings.height,
+        model: "runware:100@1",
+        numberResults: 1,
+        outputFormat: "WEBP"
+      };
+
+      const result = await runwareService.generateImage(imageParams);
+      
+      setScenes(scenes.map(s => 
+        s.id === sceneId 
+          ? { ...s, image: result.imageURL, isGeneratingImage: false }
+          : s
+      ));
+
+      toast.success('Image generated successfully!');
+    } catch (error) {
+      console.error('Image generation failed:', error);
+      toast.error('Failed to generate image. Please try again.');
+      
+      setScenes(scenes.map(s => 
+        s.id === sceneId 
+          ? { ...s, isGeneratingImage: false }
+          : s
+      ));
+    }
   };
 
   return (
@@ -85,14 +158,25 @@ FADE OUT.`;
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
+              <img src={sphaBranding} alt="SPHA Apps" className="w-8 h-8 rounded-lg" />
               <h1 className="text-xl font-bold gradient-text">AI Studio</h1>
             </div>
-            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-              Beta
-            </Badge>
+            <div className="flex items-center space-x-3">
+              {!apiKeyConnected && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowApiKeyDialog(true)}
+                  className="border-primary/20 text-primary hover:bg-primary/10"
+                >
+                  <Key className="w-4 h-4 mr-2" />
+                  Connect API
+                </Button>
+              )}
+              <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
+                {apiKeyConnected ? 'Connected' : 'Beta'}
+              </Badge>
+            </div>
           </div>
         </div>
       </header>
@@ -279,10 +363,20 @@ FADE OUT.`;
                               <Button
                                 size="sm"
                                 onClick={() => handleGenerateImage(scene.id)}
+                                disabled={scene.isGeneratingImage || !apiKeyConnected}
                                 className="bg-accent hover:bg-accent/90 text-accent-foreground"
                               >
-                                <Image className="w-3 h-3 mr-1" />
-                                Generate
+                                {scene.isGeneratingImage ? (
+                                  <>
+                                    <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin mr-1" />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Image className="w-3 h-3 mr-1" />
+                                    Generate
+                                  </>
+                                )}
                               </Button>
                             </div>
                           </div>
@@ -339,6 +433,12 @@ FADE OUT.`;
           </div>
         </div>
       </div>
+      
+      <ApiKeyDialog
+        open={showApiKeyDialog}
+        onOpenChange={setShowApiKeyDialog}
+        onApiKeySubmit={initializeRunwareService}
+      />
     </div>
   );
 };
