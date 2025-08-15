@@ -82,11 +82,12 @@ export class RunwareService {
       };
 
       this.ws.onclose = () => {
-        console.log("WebSocket closed, attempting to reconnect...");
+        console.log("WebSocket closed");
         this.isAuthenticated = false;
-        setTimeout(() => {
-          this.connectionPromise = this.connect();
-        }, 1000);
+        // Don't auto-reconnect on invalid API key to prevent infinite loops
+        if (this.ws?.readyState === WebSocket.CLOSED) {
+          console.log("Connection closed - check API key validity");
+        }
       };
     });
   }

@@ -38,17 +38,48 @@ export const StudioLayout = () => {
     }
   }, []);
 
-  const initializeRunwareService = (apiKey: string) => {
+  const initializeRunwareService = async (apiKey: string) => {
     try {
+      // Clear any existing service first
+      if (runwareService) {
+        runwareService.disconnect();
+      }
+      
       const service = new RunwareService(apiKey);
       setRunwareService(service);
       setApiKeyConnected(true);
       localStorage.setItem('runware_api_key', apiKey);
       toast.success('API key connected successfully!');
     } catch (error) {
-      toast.error('Failed to connect API key. Please try again.');
+      console.error('Failed to initialize Runware service:', error);
+      setApiKeyConnected(false);
+      localStorage.removeItem('runware_api_key');
+      toast.error('Failed to connect API key. Please check if it\'s valid.');
       throw error;
     }
+  };
+
+  const handleGenerateVideo = () => {
+    if (!apiKeyConnected) {
+      toast.error('Please connect your API key first');
+      setShowApiKeyDialog(true);
+      return;
+    }
+
+    if (scenes.length === 0) {
+      toast.error('Please generate a script and storyboard first');
+      return;
+    }
+
+    // Check if all scenes have images
+    const scenesWithoutImages = scenes.filter(scene => !scene.image);
+    if (scenesWithoutImages.length > 0) {
+      toast.error('Please generate images for all scenes first');
+      return;
+    }
+
+    // For now, show that video generation is coming soon
+    toast.success('Video generation feature coming soon! All scenes are ready.');
   };
 
   const handleGenerateScript = async () => {
@@ -302,7 +333,10 @@ FADE OUT.`;
                   </Select>
                 </div>
                 
-                <Button className="w-full bg-success hover:bg-success/90 text-white">
+                <Button 
+                  className="w-full bg-success hover:bg-success/90 text-white"
+                  onClick={handleGenerateVideo}
+                >
                   <Play className="w-4 h-4 mr-2" />
                   Generate Video
                 </Button>

@@ -41,7 +41,15 @@ export const ApiKeyDialog = ({ open, onOpenChange, onApiKeySubmit }: ApiKeyDialo
             Enter Runware API Key
           </DialogTitle>
           <DialogDescription>
-            To use AI image generation, you need to provide your Runware API key.
+            To use AI image generation, you need a valid Runware API key from{' '}
+            <a 
+              href="https://my.runware.ai/signup" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary underline"
+            >
+              my.runware.ai
+            </a>
           </DialogDescription>
         </DialogHeader>
         
@@ -86,7 +94,7 @@ export const ApiKeyDialog = ({ open, onOpenChange, onApiKeySubmit }: ApiKeyDialo
             <Button
               type="button"
               variant="outline"
-              onClick={() => window.open('https://runware.ai/', '_blank')}
+              onClick={() => window.open('https://my.runware.ai/signup', '_blank')}
               className="border-panel-border hover:bg-panel"
             >
               <ExternalLink className="w-4 h-4 mr-2" />
